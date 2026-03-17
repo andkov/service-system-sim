@@ -16,8 +16,12 @@ Core terms for standardizing project communication.
 
 - [Income Support Policy Manual](https://manuals.alberta.ca/income-and-employment-supports-policy-manual/) should be consulted for definitive current version.
 
+- `need codes` are described here: (https://statics.teams.cdn.office.net/evergreen-assets/safelinks/2/atp-safelinks.html) see Long Description in the middle of the page.  
+
 
 ### Client Type Code Taxonomy
+
+> Note from Jay: first the overal client_type_code is determined for the client (mandatory, one per client per month). Once the client type code is determined, it make availbe a suite of need code to be assigned to this person-month-client_type. 
 
 ```
 Financial Support (pc0 = FS)

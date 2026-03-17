@@ -34,41 +34,69 @@ The people served by this system are individuals. They are not abstractions. The
 | Field | Type | Description |
 |---|---|---|
 | `person_id` | integer | Unique surrogate key per individual |
-| `household_role` | factor | `Head of Household` \| `Spouse` |
+| `role_type` | factor | `Head of Household` (`HH`), `Spouse` (`SP`), `Dependent` (`DP`)|
 
-`household_role` is a payment-level attribute: it is recorded on `ds_payment` and reflects the administrative role of the person within the household at the time of the payment. It is not inferred — it is the role as recorded on the file.
+
+`role_type` is a payment-level attribute: it is recorded on `ds_payment` and reflects the administrative role of the person within the household at the time of the payment. It is not inferred — it is the role as recorded on the file.
+
+In the real system, financial support payments are issued to the Head of Household (`HH`) or Spouse (`SP`). Dependents (`DP`) are recorded for household composition and benefit calculation purposes but do not appear as independent payment recipients in `ds_payment`.
 
 ---
 
 ## 3. Programs
 
-The province administers three distinct social service programs. Each defines a fundamentally different relationship between the individual and the state: one addresses immediate economic precarity, one provides long-term support for persons with disabilities, and one protects children and families in crisis.
+This simulation is scoped to **Income Support (IS)** — one program within the broader Financial Support (FS) domain of the provincial service system. IS provides short- to medium-term economic support for individuals who are able or expected to participate in the labour market, or who face barriers limiting full employment.
 
-**Client Type Taxonomy**
+The full taxonomy of Financial Support programs follows a four-level classification hierarchy (pc0–pc3). IS is one of four pc1 programs under FS. The others — AISH, OTI, and DRES — are deferred to later development phases.
 
-| `client_type` | Program Name | Character |
-|---|---|---|
-| `IA` | Income Assistance | Short- to medium-term economic support |
-| `DS` | Disability Support | Long-term support for persons with disabilities |
-| `CFS` | Child and Family Services | Child protection and family preservation |
+**Program Classification Hierarchy (FS domain)**
 
-**Invariant**: A person has exactly one `client_type` per `pay_period`. Program assignment determines which need codes apply.
+```
+Financial Support (FS)              pc0
+│
+├── Income Support (IS)             pc1  ← simulated in v1
+│   ├── Expected to Work (ETW)      pc2
+│   └── Barriers to Full Emp. (BFE) pc2
+│
+├── AISH                            pc1  ← deferred
+│   └── AISH                        pc2
+│
+├── One Time Issues (OTI)           pc1  ← deferred
+│   └── OTI                         pc2
+│
+└── Disability-Related Emp. (DRES)  pc1  ← deferred
+```
+
+`client_type` stores the **pc2 value** directly — `ETW` or `BFE`. The pc1 value (`IS`) is always derivable from either pc2 code and need not be stored separately. When AISH, OTI, and DRES are added in later phases, `client_type` will gain their corresponding pc2 values, and pc1 will remain derivable by lookup.
+
+| `client_type` (pc2) | pc1 | Name | Character |
+|---|---|---|---|
+| `ETW` | IS | Expected to Work | Client is expected to seek, prepare for, or maintain employment |
+| `BFE` | IS | Barriers to Full Employment | Client has medical, disability, or other barriers limiting full employment |
+
+**Invariant**: A person has exactly one `client_type` per `pay_period`. `client_type` determines which need codes apply.
 
 **Need Code Taxonomy**
 
+Need codes are compositional, not mutually exclusive. A person may receive multiple need codes in the same month, generating one payment row per code. The codes available depend on `client_type`.
+
 | `client_type` | `need_code` | Description |
 |---|---|---|
-| `IA` | `basic_living` | Core living allowance |
-| `IA` | `shelter` | Housing cost supplement |
-| `IA` | `utility_supplement` | Utility cost support |
-| `DS` | `enhanced_living` | Enhanced monthly living support |
-| `DS` | `mobility_support` | Mobility and assistive device funding |
-| `DS` | `caregiver_supplement` | Support for caregiving relationships |
-| `CFS` | `family_support` | In-home family preservation services |
-| `CFS` | `foster_care` | Out-of-home foster placement support |
-| `CFS` | `kinship_care` | Extended family placement support |
+| `ETW` | `core` | Core monthly living allowance |
+| `ETW` | `shelter` | Shelter / housing supplement |
+| `ETW` | `health_benefit` | Health benefit package (dental, optical, prescription) |
+| `ETW` | `child_benefit` | Allowance for dependent children |
+| `ETW` | `transportation` | Transit / transportation support |
+| `ETW` | `child_care` | Child care subsidy (for employed or program-attending clients) |
+| `BFE` | `core` | Enhanced living allowance (higher rate than ETW) |
+| `BFE` | `shelter` | Shelter supplement |
+| `BFE` | `health_benefit` | Health benefit package |
+| `BFE` | `child_benefit` | Child benefit for dependent children |
+| `BFE` | `barrier_supplement` | Medical or multiple-barrier support |
+| `BFE` | `personal_care` | Personal care needs supplement |
+| `BFE` | `utility` | Utility cost supplement |
 
-Need codes are compositional, not mutually exclusive. A person receiving Income Assistance may receive both `basic_living` and `shelter` in the same month — generating two payment rows.
+The codes `core`, `shelter`, `health_benefit`, and `child_benefit` appear under both `ETW` and `BFE` but carry different payment amounts reflecting the higher support level of BFE clients.
 
 ---
 
@@ -83,15 +111,15 @@ Everything in this data system flows from money. A payment is the fundamental ad
 | `payment_id` | integer | Surrogate key; no semantic content |
 | `person_id` | integer | Links to person |
 | `pay_period` | date | Month of payment (YYYY-MM) |
-| `client_type` | factor | `IA` \| `DS` \| `CFS` |
-| `household_role` | factor | `Head of Household` \| `Spouse` |
-| `need_code` | factor | Program-specific payment category |
+| `client_type` | factor | `ETW` \| `BFE` (pc2; pc1 `IS` is derivable) |
+| `household_role` | factor | `HH` \| `SP` (Dependents do not receive direct payments) |
+| `need_code` | factor | `client_type`-specific payment category |
 | `payment_amount` | numeric | Dollar amount of payment |
 
 **Invariants**
 
-- One `client_type` per `person_id` per `pay_period` (no mid-month program switches)
-- Multiple rows per `person_id` × `pay_period` are allowed (multiple need codes)
+- One `client_type` per `person_id` per `pay_period` (no mid-month switches)
+- Multiple rows per `person_id` × `pay_period` are allowed (one row per need code)
 - `household_role` is constant per `person_id` within a `pay_period`
 
 ---
@@ -136,7 +164,7 @@ An episode is an uninterrupted sequence of months during which a person receives
 A new episode begins when any of the following occur:
 
 1. A payment gap — at least one `pay_period` with no payment
-2. `client_type` changes between consecutive months
+2. `client_type` changes between consecutive months (e.g., `ETW` → `BFE`)
 3. `household_role` changes between consecutive months
 
 ---
