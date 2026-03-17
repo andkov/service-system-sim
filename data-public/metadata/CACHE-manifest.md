@@ -136,6 +136,6 @@ Provides definitive information about the analysis-ready tables produced by the 
 | `RETURNED` | integer | From ds_event_count |
 | `CLOSED` | integer | From ds_event_count |
 | `delta_caseload` | integer | NEW + RETURNED - CLOSED |
-| `implied_next_caseload` | integer | active_clients + delta_caseload |
+| `implied_caseload` | integer | active_clients - delta_caseload; equals lag(active_clients) when identity holds |
 
-**Stock-flow identity**: `Caseload(t) = Caseload(t-1) + NEW(t) + RETURNED(t) - CLOSED(t)` must hold exactly.
+**Stock-flow identity**: `active(t) = active(t-1) + NEW(t) + RETURNED(t) - CLOSED(t)` must hold exactly.

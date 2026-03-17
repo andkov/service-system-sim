@@ -128,12 +128,12 @@ ds_rail  <- tibble::tribble(
   "run_r"     , "manipulation/01-payment-month.R",
   
   # Branch A: episodes → events → event counts
-  "run_r"     , "manipulation/2a-episode.R",
-  "run_r"     , "manipulation/3a-event.R",
-  "run_r"     , "manipulation/4a-event-count.R",
+  "run_r"     , "manipulation/02a-episode.R",
+  "run_r"     , "manipulation/03a-event.R",
+  "run_r"     , "manipulation/04a-event-count.R",
   
   # Branch B: caseload (active client counts)
-  "run_r"     , "manipulation/2b-caseload.R",
+  "run_r"     , "manipulation/02b-caseload.R",
   
   # Merge: reconcile caseload with events (stock-flow identity)
   "run_r"     , "manipulation/05-caseload-event.R",

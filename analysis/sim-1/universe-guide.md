@@ -34,10 +34,10 @@ The people served by this system are individuals. They are not abstractions. The
 | Field | Type | Description |
 |---|---|---|
 | `person_id` | integer | Unique surrogate key per individual |
-| `role_type` | factor | `Head of Household` (`HH`), `Spouse` (`SP`), `Dependent` (`DP`)|
+| `household_role` | factor | `Head of Household` (`HH`), `Spouse` (`SP`), `Dependent` (`DP`)|
 
 
-`role_type` is a payment-level attribute: it is recorded on `ds_payment` and reflects the administrative role of the person within the household at the time of the payment. It is not inferred — it is the role as recorded on the file.
+`household_role` is a payment-level attribute: it is recorded on `ds_payment` and reflects the administrative role of the person within the household at the time of the payment. It is not inferred — it is the role as recorded on the file.
 
 In the real system, financial support payments are issued to the Head of Household (`HH`) or Spouse (`SP`). Dependents (`DP`) are recorded for household composition and benefit calculation purposes but do not appear as independent payment recipients in `ds_payment`.
 
@@ -149,21 +149,25 @@ An episode is an uninterrupted sequence of months during which a person receives
 
 **`ds_episode`** — *Derived from `ds_payment_month`*
 
-| Field | Type | Description |
+| Field | Type | Aggregation Property |
 |---|---|---|
-| `person_id` | integer | |
-| `episode_id` | integer | Unique per person (surrogate, no cross-person meaning) |
-| `episode_start` | date | First `pay_period` of episode |
-| `episode_end` | date | Last `pay_period` (NA if ongoing at simulation end) |
-| `client_type` | factor | Constant within episode |
-| `household_role` | factor | Constant within episode |
-| `episode_length_months` | integer | Derived from start and end |
+| `person_id` | integer | — |
+| `spell_id` | integer | Groups SPELL_BITs into SPELLs (gap-based only) |
+| `episode_id` | integer | Unique per person; identifies the SPELL_BIT |
+| `episode_start` | date | **Extremal** (MIN across SPELL_BITs → SPELL start) |
+| `episode_end` | date | **Extremal** (MAX, NA if ongoing) |
+| `client_type` | character | **Not aggregatable** (varies across SPELL_BITs) |
+| `household_role` | character | **Not aggregatable** |
+| `episode_length_months` | integer | **Non-additive** ⚠️ — recompute from start/end for SPELLs |
+| `n_months` | integer | **Additive** ✅ |
+| `total_payment` | numeric | **Additive** ✅ |
+| `n_need_codes_total` | integer | **Additive** ✅ |
 
 **Episode Boundary Rules**
 
 A new episode begins when any of the following occur:
 
-1. A payment gap — at least one `pay_period` with no payment
+1. A payment gap — **two or more consecutive** `pay_period`s with no payment (a single-month gap does not break continuity — see SPELL definition in glossary)
 2. `client_type` changes between consecutive months (e.g., `ETW` → `BFE`)
 3. `household_role` changes between consecutive months
 
@@ -186,13 +190,15 @@ Events are the language in which a caseload speaks about itself over time. They 
 
 **Event Type Definitions**
 
-| `event_type` | Condition |
-|---|---|
-| `NEW` | Episode start; this person has never had a prior episode |
-| `RETURNED` | Episode start; this person had at least one prior episode |
-| `CLOSED` | Episode end; the person leaves the active caseload |
+| `event_type` | `event_month` | Condition |
+|---|---|---|
+| `NEW` | First active month | Episode start; this person has never had a prior episode |
+| `RETURNED` | First active month | Episode start; this person had at least one prior episode |
+| `CLOSED` | First absent month | Episode end; `episode_end + 1 month` — the first month the person is absent, not their last active month |
 
 Each episode generates at most two events: one at its start (`NEW` or `RETURNED`) and one at its end (`CLOSED`). An ongoing episode at simulation end generates only a start event.
+
+**Timing convention for CLOSED**: The CLOSED event is recorded in the first month of absence (`episode_end + 1 month`). This aligns with the stock-flow identity — CLOSED(t) reduces the caseload beginning in month t, meaning the person was present in `t-1` and absent in `t`.
 
 ---
 
@@ -251,9 +257,11 @@ The reconciliation table is the analytical conscience of the system. It brings t
 | `RETURNED` | integer | From `ds_event_count` |
 | `CLOSED` | integer | From `ds_event_count` |
 | `delta_caseload` | integer | `NEW + RETURNED - CLOSED` |
-| `implied_next_caseload` | integer | `active_clients + delta_caseload` |
+| `implied_caseload` | integer | `active_clients - delta_caseload`; equals `lag(active_clients)` when identity holds |
 
-When `implied_next_caseload` at time $t$ equals `active_clients` at time $t+1$, the identity holds. Divergence surfaces either a simulation inconsistency or the boundary conditions of a stratified analysis.
+When `implied_caseload` at time $t$ equals `lag(active_clients)` at time $t$, the identity holds. Equivalently: `active(t) = active(t-1) + NEW(t) + RETURNED(t) - CLOSED(t)` must hold for every cell.
+
+Divergence surfaces either a simulation inconsistency or an event-timing bug.
 
 ---
 
