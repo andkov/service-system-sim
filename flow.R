@@ -118,14 +118,28 @@ ds_rail  <- tibble::tribble(
   ~fx         , ~path,
 
   # ===============================
-  # PHASE 1: DATA IMPORT & PREPARATION  
+  # PHASE 1: SIMULATION & DATA PIPELINE
   # ===============================
   
-  # Main ETL (Extract-Transform-Load) from Google Sheets to local formats
-  # "run_r"     , "manipulation/0-ellis.R",              # Core data import and prep - creates long and wide format datasets
-  # "run_r"     , "manipulation/1-ellis-ua-admin.R",              # Enhance geography data with bookstore infrastructure - creates enhanced datasets
-  # "run_r"     , "manipulation/2-ellis-extra.R",              # Adding extra custom data in future developments
-  # "run_r"     , "manipulation/last-ellis.R",              
+  # Simulation (generates ds_payment)
+  "run_r"     , "manipulation/00-sim.R",
+  
+  # Derive: payment-month (collapses ds_payment → ds_payment_month)
+  "run_r"     , "manipulation/01-payment-month.R",
+  
+  # Branch A: episodes → events → event counts
+  "run_r"     , "manipulation/2a-episode.R",
+  "run_r"     , "manipulation/3a-event.R",
+  "run_r"     , "manipulation/4a-event-count.R",
+  
+  # Branch B: caseload (active client counts)
+  "run_r"     , "manipulation/2b-caseload.R",
+  
+  # Merge: reconcile caseload with events (stock-flow identity)
+  "run_r"     , "manipulation/05-caseload-event.R",
+  
+  # Export: bundle outputs for downstream consumers
+  "run_r"     , "manipulation/99-export.R",
   
   # ===============================
   # PHASE 2: ANALYSIS SCRIPTS
