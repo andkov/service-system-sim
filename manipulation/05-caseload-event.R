@@ -126,10 +126,21 @@ ds_caseload_event <- ds_caseload %>%
     across(c(NEW, RETURNED, CLOSED), ~ replace_na(., 0L)),
     active_clients = replace_na(active_clients, 0L)
   ) %>%
-  # Compute flow and implied next caseload
+  # Compute flow columns
+  # delta_caseload: net flow in this month (positive = caseload grew, negative = shrank)
+  # implied_caseload: what active_clients SHOULD be this month, derived from the previous
+  #   month's stock plus this month's flows. When this equals active_clients, the
+  #   stock-flow identity holds.
+  #
+  # Stock-flow identity (C-05, corrections-2026-03-17.md):
+  #   active(t) = active(t-1) + NEW(t) + RETURNED(t) - CLOSED(t)
+  #
+  # CLOSED(t) = first absent month (episode_end + 1), NOT the last active month.
+  # NEW(t)/RETURNED(t) = first active month of the episode.
+  # All events "belong to" the month they describe entry into or exit from.
   mutate(
-    delta_caseload       = NEW + RETURNED - CLOSED,
-    implied_next_caseload = active_clients + delta_caseload
+    delta_caseload    = NEW + RETURNED - CLOSED,
+    implied_caseload  = active_clients - delta_caseload  # = lag(active) reconstructed
   ) %>%
   arrange(pay_period, client_type, household_role)
 
@@ -141,14 +152,18 @@ cat("✅ ds_caseload_event:", nrow(ds_caseload_event), "rows\n")
 # ---- validate ----------------------------------------------------------------
 cat("\n🔍 SECTION 3: Validate — stock-flow identity\n")
 
-# For each cell (client_type × household_role), check that
-# implied_next_caseload(t) == active_clients(t+1)
+# Correct form of the stock-flow identity:
+#   active(t) = active(t-1) + NEW(t) + RETURNED(t) - CLOSED(t)
+#
+# Verified by: for each cell, does lag(active) + NEW + RETURNED - CLOSED == active?
+# The first month in each cell is excluded (no lag reference).
 identity_check <- ds_caseload_event %>%
   group_by(client_type, household_role) %>%
   arrange(pay_period) %>%
   mutate(
-    next_actual = lead(active_clients),
-    identity_holds = is.na(next_actual) | (implied_next_caseload == next_actual)
+    prev_active       = lag(active_clients, default = NA_integer_),
+    implied_current   = prev_active + NEW + RETURNED - CLOSED,
+    identity_holds    = is.na(prev_active) | (implied_current == active_clients)
   ) %>%
   ungroup()
 
@@ -157,19 +172,20 @@ n_violations <- sum(!identity_check$identity_holds, na.rm = TRUE)
 if (n_violations == 0) {
   cat("✅ Stock-flow identity holds for ALL cells — PASSED\n")
 } else {
-  cat("⚠️  Stock-flow identity VIOLATIONS:", n_violations, "\n")
+  cat("❌ Stock-flow identity VIOLATIONS:", n_violations, "\n")
   cat("Showing first violations:\n")
   identity_check %>%
     filter(!identity_holds) %>%
     select(pay_period, client_type, household_role,
-           active_clients, NEW, RETURNED, CLOSED,
-           implied_next_caseload, next_actual) %>%
+           prev_active, NEW, RETURNED, CLOSED,
+           implied_current, active_clients) %>%
     slice_head(n = 10) %>%
     print()
-  # TODO: Decide whether to stop or warn
-  # stopifnot("Stock-flow identity violated" = n_violations == 0)
-  cat("⚠️  Identity violations may indicate simulation edge cases or\n")
-  cat("   boundary conditions. Review before treating as hard failure.\n")
+  stopifnot(
+    "Stock-flow identity violated — this is a pipeline bug, not a modeling finding.
+     See corrections-2026-03-17.md C-05 and C-06." =
+      n_violations == 0
+  )
 }
 
 # ==============================================================================

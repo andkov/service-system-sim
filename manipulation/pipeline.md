@@ -34,15 +34,15 @@ Scripts are organised into two categories:
                 │
         ┌───────┴───────┐
         ▼               ▼
-2a-episode.R      2b-caseload.R
+02a-episode.R      02b-caseload.R
   ds_episode        ds_caseload
         │                   │
         ▼                   │
-3a-event.R                  │
+03a-event.R                  │
   ds_event                  │
         │                   │
         ▼                   │
-4a-event-count.R            │
+04a-event-count.R            │
   ds_event_count            │
         │                   │
         └───────┬───────────┘
@@ -60,10 +60,10 @@ Scripts are organised into two categories:
 |:--|:-------|:--------|:-----------|:-----------|
 | 0 | [**00-sim.R**](#lane-0--00-simr) | Sim | `payment.sqlite::ds_payment` | — |
 | 1 | [**01-payment-month.R**](#lane-1--01-payment-monthr) | Derive | `payment.sqlite::ds_payment_month` | 0 |
-| 2a | [**2a-episode.R**](#lane-2a--2a-episoder) | Derive | `episode.sqlite::ds_episode` | 1 |
-| 2b | [**2b-caseload.R**](#lane-2b--2b-caseloadr) | Derive | `timeseries.sqlite::ds_caseload` | 1 |
-| 3a | [**3a-event.R**](#lane-3a--3a-eventr) | Derive | `episode.sqlite::ds_event` | 2a |
-| 4a | [**4a-event-count.R**](#lane-4a--4a-event-countr) | Derive | `timeseries.sqlite::ds_event_count` | 3a |
+| 2a | [**02a-episode.R**](#lane-2a--2a-episoder) | Derive | `episode.sqlite::ds_episode` | 1 |
+| 2b | [**02b-caseload.R**](#lane-2b--2b-caseloadr) | Derive | `timeseries.sqlite::ds_caseload` | 1 |
+| 3a | [**03a-event.R**](#lane-3a--3a-eventr) | Derive | `episode.sqlite::ds_event` | 2a |
+| 4a | [**04a-event-count.R**](#lane-4a--4a-event-countr) | Derive | `timeseries.sqlite::ds_event_count` | 3a |
 | 5 | [**05-caseload-event.R**](#lane-5--05-caseload-eventr) | Reconcile | `timeseries.sqlite::ds_caseload_event` | 2b + 4a |
 | 99 | [**99-export.R**](#lane-99--99-exportr) | Export | `./data-private/derived/export/` | All |
 
@@ -113,7 +113,7 @@ Each script can be run independently (useful for development/debugging):
 ```bash
 Rscript manipulation/00-sim.R
 Rscript manipulation/01-payment-month.R
-Rscript manipulation/2a-episode.R
+Rscript manipulation/02a-episode.R
 # ... etc.
 ```
 
@@ -174,7 +174,7 @@ Additional interesting cases may be discovered post-hoc from the randomly genera
 
 ## Episode Operationalization
 
-**This section discloses the analytical choices embedded in `2a-episode.R`.**
+**This section discloses the analytical choices embedded in `02a-episode.R`.**
 
 ### Default: SPELL_BIT
 
